@@ -6,7 +6,7 @@ export default function PageHeader({ title }: { title: string }) {
     year: "numeric",
   }).format(new Date());
   return (
-    <div className="bg-primary-foreground flex justify-between py-3 px-7 border-b border-primary text-muted-foreground">
+    <div className="bg-primary-foreground flex justify-between py-3 px-7 border-b-2 border-primary text-muted-foreground">
       {" "}
       <h2 className="uppercase  font-bold">{title}</h2>
       <h2>{currentDate}</h2>
