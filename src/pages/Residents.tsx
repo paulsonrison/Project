@@ -1,3 +1,3 @@
 export default function Residents() {
-	return <p>Residents</p>;
+  return <p>Residents</p>;
 }
