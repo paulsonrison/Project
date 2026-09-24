@@ -8,16 +8,19 @@ import Calendar from "../pages/Calendar";
 import DeliveryBoy from "../pages/DeliveryBoy";
 import Settings from "../pages/Settings";
 import Residents from "../pages/Residents";
-import AppLayout from "../components/layout/AppLayout";
+import PageLayout from "../components/layout/PageLayout";
+import PublicLayout from "../components/layout/PublicLayout";
 
 const AppRouter = () => {
   return (
     <Routes>
-      <Route path="/home" element={<Home />} />
-      <Route path="/about-us" element={<AboutUs />} />
-      <Route path="/contact-us" element={<ContactUs />} />
-      <Route path="/signin" element={<SignIn />} />
-      <Route element={<AppLayout />}>
+      <Route element={<PublicLayout/>}>
+        <Route path="/home" element={<Home />} />
+        <Route path="/about-us" element={<AboutUs />} />
+        <Route path="/contact-us" element={<ContactUs />} />
+        <Route path="/signin" element={<SignIn />} />
+      </Route>
+      <Route element={<PageLayout />}>
         <Route path="/billing" element={<Billing />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/delivery-boy" element={<DeliveryBoy />} />

@@ -1,3 +1,3 @@
 export default function DeliveryBoy() {
-	return <p>DeliveryBoy</p>;
+  return <p>DeliveryBoy</p>;
 }
