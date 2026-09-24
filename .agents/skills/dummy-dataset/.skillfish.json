@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "dummy-dataset",
+  "owner": "phuryn",
+  "repo": "pm-skills",
+  "path": "pm-execution/skills/dummy-dataset",
+  "branch": "main",
+  "sha": "ceac642215f5114780993d051c79e9b8a900576d",
+  "source": "manual"
+}
