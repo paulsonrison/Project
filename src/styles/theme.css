@@ -1,0 +1,87 @@
+@theme {
+  /* ----------------------------------------------------------
+     COLORS
+  ---------------------------------------------------------- */
+
+  /* Primary */
+  --color-primary: #111111;
+  --color-primary-foreground: #f2ecd9;
+
+  /* Secondary */
+  --color-secondary: #d9d1bc;
+  --color-secondary-foreground: #111111;
+
+  /* Accent */
+  --color-accent: #bf1e1e;
+  --color-accent-foreground: #f2ecd9;
+
+  /* Background */
+  --color-background: #f2ecd9;
+  --color-background-subtle: #ede7d4;
+  --color-background-muted: #c8c0aa;
+   --color-background-edit: #e5dfc8;
+   --color-background-drag: #c8bfa8;
+
+  /* Foreground */
+  --color-foreground: #111111;
+  --color-foreground-muted: #5a5240;
+
+  /* Card */
+  --color-card: #ede7d4;
+  --color-card-foreground: #111111;
+
+  /* Border */
+  --color-border: #111111;
+  --color-border-focus: #bf1e1e;
+  --color-border-subtle: rgba(255, 255, 255, 0.2);
+
+  /* Ring (focus outline) */
+  --color-ring: #bf1e1e;
+
+  /* Muted */
+  --color-muted: #c8c0aa;
+  --color-muted-foreground: #5a5240;
+
+  /* Semantic */
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --color-danger: #bf1e1e;
+
+  /* Sidebar */
+  --color-sidebar: #111111;
+   --color-sidebar-foreground-muted: rgba(255, 255, 255, 0.6);
+   --color-overlay: rgba(17, 17, 17, 0.55);
+
+  /* ----------------------------------------------------------
+     TYPOGRAPHY
+  ---------------------------------------------------------- */
+
+  --font-ui: "Libre Franklin", sans-serif;
+  --font-body: "Lora", Georgia, serif;
+  --font-mono: "DM Mono", monospace;
+
+  /* ----------------------------------------------------------
+     BORDER RADIUS
+  ---------------------------------------------------------- */
+
+  --radius: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+
+  /* ----------------------------------------------------------
+     SPACING / SIZING
+  ---------------------------------------------------------- */
+
+  --width-sidebar: 13rem; /* w-52 */
+  --width-side-panel: 18rem; /* w-72  — calendar detail pane */
+  --width-modal: 32rem; /* max-w-lg */
+  --width-modal-wide: 48rem; /* max-w-3xl */
+
+  /* ----------------------------------------------------------
+     TRANSITIONS
+  ---------------------------------------------------------- */
+
+  --transition-colors: color, background-color, border-color 150ms ease;
+}

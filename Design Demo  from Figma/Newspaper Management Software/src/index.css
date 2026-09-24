@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700;900&family=Lora:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+@import 'tailwindcss';
+
+@theme inline {
+  --color-background: #F2ECD9;
+  --color-foreground: #111111;
+  --color-card: #EDE7D4;
+  --color-card-foreground: #111111;
+  --color-primary: #111111;
+  --color-primary-foreground: #F2ECD9;
+  --color-secondary: #D9D1BC;
+  --color-secondary-foreground: #111111;
+  --color-muted: #C8C0AA;
+  --color-muted-foreground: #5A5240;
+  --color-accent: #BF1E1E;
+  --color-accent-foreground: #F2ECD9;
+  --color-border: #111111;
+  --color-ring: #BF1E1E;
+  --radius: 0px;
+}
+
+:root {
+  font-family: 'Lora', Georgia, serif;
+  background-color: #F2ECD9;
+  color: #111111;
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: 'Libre Franklin', sans-serif;
+}
+
+.font-mono, .tabular-nums {
+  font-family: 'DM Mono', monospace;
+}
+
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+*:hover {
+  scrollbar-width: thin;
+}
+*:hover::-webkit-scrollbar {
+  display: block;
+  width: 4px;
+  height: 4px;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: #5A5240;
+}
+*:hover::-webkit-scrollbar-track {
+  background: transparent;
+}

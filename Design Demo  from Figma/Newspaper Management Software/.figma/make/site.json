@@ -1,0 +1,10 @@
+{
+  "description": "Manage newspaper subscriptions and billing efficiently with monthly tracking, multi-newspaper assignments per user, and automated invoice generation.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
