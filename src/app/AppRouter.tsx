@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router";
-import Home from "../pages/home";
+import Home from "../pages/Home";
 import AboutUs from "../pages/AboutUs";
 import ContactUs from "../pages/ContactUs";
 import SignIn from "../pages/SignIn";
