@@ -18,23 +18,17 @@
           hover:bg-accent;
   }
 
-  .btn-primary-sm {
-        @apply px-2 py-1 bg-primary text-primary-foreground
-          hover:bg-accent;
-  }
-
   .btn-secondary {
         @apply px-4 py-2 border border-border text-foreground
           bg-transparent hover:bg-primary hover:text-primary-foreground;
   }
 
-  .btn-secondary-sm {
-        @apply px-2 py-1 border border-border text-foreground
-          bg-transparent hover:bg-primary hover:text-primary-foreground;
+  .btn-danger {
+        @apply px-4 py-2 bg-accent text-primary-foreground
+          hover:bg-accent-secondary;
   }
 
-
-  .btn-danger {
+  .btn-ghost {
         @apply px-4 py-2 bg-transparent text-foreground
           hover:text-accent;
   }
@@ -54,12 +48,10 @@
   /* Icon-only action buttons (edit, delete, etc.) */
   .btn-icon {
     @apply inline-flex items-center justify-center
-           p-1 text-foreground transition-colors cursor-pointer;
+           p-1 transition-colors cursor-pointer;
   }
 
-  .btn-icon-danger {
-    @apply hover:text-accent;
-  }
+
 
   .btn-icon-edit {
     @apply hover:text-accent;
