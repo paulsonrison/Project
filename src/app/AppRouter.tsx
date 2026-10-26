@@ -3,6 +3,7 @@ import AppShell from '../features/workspace/AppShell';
 import ChatView from '../features/workspace/ChatView';
 import ComplaintsView from '../features/workspace/ComplaintsView';
 import PricingEditor from '../features/workspace/PricingEditor';
+import Dashboard from '../features/workspace/Dashboard';
 import { AboutScreen, ContactScreen, PublicHome, SignInScreen } from '../features/workspace/PublicScreens';
 import { BillingScreen, DeliveryScreen, LedgerScreen, PausesScreen, ResidentsScreen, SettingsScreen, SubscriptionsScreen } from '../features/workspace/Screens';
 
@@ -14,7 +15,7 @@ const AppRouter = () => {
       <Route path="/contact-us" element={<ContactScreen />} />
       <Route path="/signin" element={<SignInScreen />} />
       <Route element={<AppShell />}>
-        <Route path="/dashboard" element={<Navigate to="/calendar" replace />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/billing" element={<BillingScreen />} />
         <Route path="/calendar" element={<DeliveryScreen calendar />} />
         <Route path="/delivery-boy" element={<DeliveryScreen />} />

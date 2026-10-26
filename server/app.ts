@@ -57,6 +57,11 @@ export function createApp({ db, client, config }: Dependencies) {
       const offset = Math.max(0, Math.min(100000, Number(req.query.offset) || 0));
       const filter = { ...visibleFilter(scope, resource), archived: { $ne: true } };
       const items = await db.collection(resource).find(filter, { projection: { _id: 0 } }).sort({ name: 1, startDate: -1 }).skip(offset).limit(100).toArray();
+      if (resource === 'subscriptions') for (const item of items) {
+        const resident = await db.collection('residents').findOne({ id: item.residentId, societyId: scope.societyId });
+        const paper = await db.collection('publications').findOne({ id: item.publicationId, societyId: scope.societyId });
+        Object.assign(item, { residentName: resident?.name ?? 'Archived resident', publicationName: paper?.name ?? 'Archived publication' });
+      }
       res.json({ items, offset, total: await db.collection(resource).countDocuments(filter) });
     });
     app.post(`/api/v1/${resource}`, async (req, res) => {
@@ -84,6 +89,9 @@ export function createApp({ db, client, config }: Dependencies) {
       }
       const entity = { ...data, id: randomUUID(), societyId: scope.societyId, revision: 0, createdAt: new Date().toISOString() };
       await db.collection(resource).insertOne(entity);
+      if (resource === 'pauses' && 'startDate' in data && 'endDate' in data && 'residentId' in data) {
+        await db.collection('deliveries').updateMany({ societyId: scope.societyId, residentId: data.residentId, ...('subscriptionId' in data && data.subscriptionId ? { subscriptionId: data.subscriptionId } : {}), date: { $gte: data.startDate, $lt: data.endDate }, invoiceId: { $exists: false }, status: { $in: ['pending', 'paused'] } }, { $set: { status: 'paused', billableQuantity: 0 }, $inc: { revision: 1 } });
+      }
       res.status(201).json(entity);
     });
     app.patch(`/api/v1/${resource}/:id`, async (req, res) => {

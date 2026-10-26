@@ -69,11 +69,33 @@ describe('integration account and society isolation', () => {
     const resident = (await a.post('/api/v1/residents').set('Origin', origin).send({ name: 'Reader', unit: 'A1' })).body;
     const staff = (await a.post('/api/v1/staff').set('Origin', origin).send({ name: 'Carrier' })).body;
     const paper = (await a.post('/api/v1/publications').set('Origin', origin).send({ name: 'Paper', schedule: 'daily', basePrice: 100 })).body;
-    await a.post('/api/v1/subscriptions').set('Origin', origin).send({ residentId: resident.id, staffId: staff.id, publicationId: paper.id, startDate: '2090-01-01' });
+    const sub = (await a.post('/api/v1/subscriptions').set('Origin', origin).send({ residentId: resident.id, staffId: staff.id, publicationId: paper.id, startDate: '2090-01-01' })).body;
     await a.post('/api/v1/deliveries/manifest').set('Origin', origin).send({ date: '2090-01-01' });
+    const prepared = (await a.get('/api/v1/deliveries?date=2090-01-03')).body.items[0];
     await a.post('/api/v1/pauses').set('Origin', origin).send({ residentId: resident.id, startDate: '2090-01-03', endDate: '2090-01-05' });
+    expect((await a.patch(`/api/v1/deliveries/${prepared.id}`).set('Origin', origin).send({ revision: prepared.revision, status: 'delivered', deliveredQuantity: 1 })).status).toBe(409);
     await a.post('/api/v1/deliveries/manifest').set('Origin', origin).send({ date: '2090-01-03' });
     expect((await a.get('/api/v1/deliveries?date=2090-01-03')).body.items[0].status).toBe('paused');
+    await a.patch(`/api/v1/subscriptions/${sub.id}`).set('Origin', origin).send({ revision: 0, endDate: '2090-01-06' });
+    await a.post('/api/v1/deliveries/manifest').set('Origin', origin).send({ date: '2090-01-07' });
+    expect((await a.get('/api/v1/deliveries?date=2090-01-07')).body.items[0].status).toBe('publication-cancelled');
+    await a.patch(`/api/v1/subscriptions/${sub.id}`).set('Origin', origin).send({ revision: 1, endDate: '2090-01-08' });
+    await a.post('/api/v1/deliveries/manifest').set('Origin', origin).send({ date: '2090-01-07' });
+    expect((await a.get('/api/v1/deliveries?date=2090-01-07')).body.items[0].status).toBe('pending');
+  });
+  it('integration keeps accepted unbilled delivery claims non-chargeable', async () => {
+    const admin = request.agent(app), origin = 'http://localhost:5173';
+    await admin.post('/api/v1/auth/register').set('Origin', origin).send({ email: 'complaint@example.test', password: 'complaint-password-123', name: 'Admin', society: 'Claims' });
+    const resident = (await admin.post('/api/v1/residents').set('Origin', origin).send({ name: 'Reader', unit: 'A1' })).body;
+    const staff = (await admin.post('/api/v1/staff').set('Origin', origin).send({ name: 'Carrier' })).body;
+    const paper = (await admin.post('/api/v1/publications').set('Origin', origin).send({ name: 'Paper', schedule: 'daily', basePrice: 100 })).body;
+    await admin.post('/api/v1/subscriptions').set('Origin', origin).send({ residentId: resident.id, staffId: staff.id, publicationId: paper.id, startDate: '2026-01-01', endDate: '2026-01-02' });
+    await admin.post('/api/v1/deliveries/manifest').set('Origin', origin).send({ date: '2026-01-01' });
+    const job = (await admin.get('/api/v1/deliveries?date=2026-01-01')).body.items[0];
+    const claim = (await admin.post('/api/v1/complaints').set('Origin', origin).send({ residentId: resident.id, deliveryId: job.id, reason: 'No paper received' })).body;
+    expect((await admin.post(`/api/v1/complaints/${claim.id}/review`).set('Origin', origin).send({ status: 'accepted', reason: 'Confirmed missed delivery' })).status).toBe(200);
+    const updated = (await admin.get('/api/v1/deliveries?date=2026-01-01')).body.items[0];
+    expect((await admin.patch(`/api/v1/deliveries/${job.id}`).set('Origin', origin).send({ revision: updated.revision, status: 'delivered', deliveredQuantity: 1 })).status).toBe(409);
   });
   it('integration invitations enforce resident access and private chat ownership', async () => {
     const admin = request.agent(app), resident = request.agent(app), origin = 'http://localhost:5173';
@@ -116,10 +138,12 @@ describe('integration account and society isolation', () => {
     await carrier.post('/api/v1/auth/accept-invitation').set('Origin', origin).send({ token, name: 'Carrier', password: 'carrier-password-123' });
     await admin.post('/api/v1/deliveries/manifest').set('Origin', origin).send({ date: '2091-01-01' });
     const original = (await carrier.get('/api/v1/deliveries?date=2091-01-01')).body.items[0];
+    const conversation = (await carrier.post('/api/v1/chat/threads').set('Origin', origin).send({})).body;
     expect(original).toBeDefined();
     await admin.patch(`/api/v1/subscriptions/${sub.id}`).set('Origin', origin).send({ revision: 0, staffId: replacement.id });
     expect((await carrier.get('/api/v1/deliveries?date=2091-01-01')).body.items).toEqual([]);
     expect((await carrier.patch(`/api/v1/deliveries/${original.id}`).set('Origin', origin).send({ revision: original.revision, status: 'delivered', deliveredQuantity: 1 })).status).toBe(404);
     expect((await carrier.get('/api/v1/invoices')).status).toBe(403);
+    expect((await carrier.get(`/api/v1/chat/threads/${conversation.id}`)).status).toBe(409);
   });
 });

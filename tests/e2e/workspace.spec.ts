@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
-test('society onboarding, resident persistence and private assistant states', async ({ page }) => {
+test('society onboarding, resident persistence and private assistant states', async ({ page }, testInfo) => {
   await page.goto('/signin?mode=register');
   await page.getByLabel('Your name').fill('Browser Test Admin');
   await page.getByLabel('Email address').fill(`browser-${Date.now()}@example.test`);
   await page.getByLabel('Society / business name').fill('Morning Society');
   await page.getByLabel('Password', { exact: true }).fill('browser-test-password-123');
   await page.getByRole('button', { name: 'Create workspace' }).click();
-  await expect(page.getByRole('heading', { name: 'Your month, edition by edition.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Every morning, a clear start.' })).toBeVisible();
   await page.getByRole('link', { name: 'Residents', exact: false }).click();
   await page.getByRole('button', { name: 'Add resident' }).click();
   await page.getByLabel('Full name').fill('Test Reader');
@@ -17,6 +17,8 @@ test('society onboarding, resident persistence and private assistant states', as
   await expect(page.getByRole('cell', { name: 'Test Reader', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Account assistant' }).click();
   await expect(page.getByRole('heading', { name: 'A little clarity, on demand.' })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: testInfo.outputPath('chat-desktop.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'What subscriptions do I have?' }).click();
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByRole('alert')).toContainText('not configured');
@@ -26,4 +28,6 @@ test('society onboarding, resident persistence and private assistant states', as
   await page.getByRole('button', { name: 'Toggle navigation' }).click();
   await expect(page.getByRole('link', { name: 'Residents', exact: false })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Close navigation', exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath('chat-mobile.png'), fullPage: true, animations: 'disabled' });
 });

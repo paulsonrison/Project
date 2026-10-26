@@ -22,7 +22,7 @@ export function operations({ db, client }: Dependencies) {
       const pauses = await collection('pauses').find({ societyId: scope.societyId, residentId: sub.residentId, archived: { $ne: true }, $or: [{ subscriptionId: sub.id }, { subscriptionId: { $exists: false } }] }).toArray();
       const dates = getServiceDates(paper as unknown as Publication, sub as unknown as DateRange, [], ym);
       const future = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-      await collection('deliveries').updateMany({ societyId: scope.societyId, subscriptionId: sub.id, invoiceId: { $exists: false }, date: { $gte: `${ym}-01`, $lt: `${ym}-32`, $nin: dates }, status: { $in: ['pending', 'paused'] } }, { $set: { status: 'publication-cancelled', billableQuantity: 0 }, $inc: { revision: 1 } });
+      await collection('deliveries').updateMany({ societyId: scope.societyId, subscriptionId: sub.id, invoiceId: { $exists: false }, date: { $gte: `${ym}-01`, $lt: `${ym}-32`, $nin: dates }, status: { $in: ['pending', 'paused'] } }, { $set: { status: 'publication-cancelled', cancellationReason: 'subscription-ineligible', billableQuantity: 0 }, $inc: { revision: 1 } });
       for (const serviceDate of dates) {
         const paused = pauses.some(p => serviceDate >= p.startDate && serviceDate < p.endDate) || (sub.archived && serviceDate >= sub.archivedDate) || (paper.archived && serviceDate >= paper.archivedDate) || (resident.archived && serviceDate >= resident.archivedDate);
         await collection('deliveries').updateOne({ societyId: scope.societyId, subscriptionId: sub.id, date: serviceDate }, { $setOnInsert: {
@@ -33,7 +33,7 @@ export function operations({ db, client }: Dependencies) {
           orderedQuantity: sub.quantity, deliveredQuantity: 0, billableQuantity: 0, revision: 0,
           priceMinor: resolvePrice(paper as unknown as Publication, serviceDate),
         } }, { upsert: true });
-        if (serviceDate >= future) await collection('deliveries').updateOne({ societyId: scope.societyId, subscriptionId: sub.id, date: serviceDate, invoiceId: { $exists: false }, status: { $in: ['pending', 'paused'] } }, { $set: { status: paused ? 'paused' : 'pending', staffId: sub.staffId, orderedQuantity: sub.quantity, priceMinor: resolvePrice(paper as unknown as Publication, serviceDate) }, $inc: { revision: 1 } });
+        if (serviceDate >= future) await collection('deliveries').updateOne({ societyId: scope.societyId, subscriptionId: sub.id, date: serviceDate, invoiceId: { $exists: false }, $or: [{ status: { $in: ['pending', 'paused'] } }, { status: 'publication-cancelled', cancellationReason: 'subscription-ineligible' }] }, { $set: { status: paused ? 'paused' : 'pending', staffId: sub.staffId, orderedQuantity: sub.quantity, priceMinor: resolvePrice(paper as unknown as Publication, serviceDate) }, $unset: { cancellationReason: '' }, $inc: { revision: 1 } });
       }
     }
   }
@@ -56,12 +56,18 @@ export function operations({ db, client }: Dependencies) {
     const data = z.object({ revision: z.number().int(), deliveredQuantity: z.number().int().min(0).max(100), status: z.enum(['delivered', 'partial', 'missed', 'publication-cancelled']), reason: z.string().max(200).default('') }).parse(req.body);
     const job = await collection('deliveries').findOne({ ...await deliveryFilter(db, scope), id: req.params.id });
     if (!job) throw new ApiError(404, 'Delivery not found');
-    if (job.invoiceId || job.status === 'paused') throw new ApiError(409, 'Billed or paused delivery cannot be changed');
+    if (job.invoiceId || job.status === 'paused' || job.complaintResolved) throw new ApiError(409, 'Billed, paused or reviewed delivery cannot be changed');
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    if (job.date > today) throw new ApiError(409, 'Future deliveries cannot be confirmed early');
+    const subscription = await collection('subscriptions').findOne({ societyId: scope.societyId, id: job.subscriptionId });
+    if (!subscription || (subscription.archived && job.date >= subscription.archivedDate) || (subscription.endDate && job.date >= subscription.endDate)) throw new ApiError(409, 'Subscription is not active for this service date');
+    const activePause = await collection('pauses').findOne({ societyId: scope.societyId, residentId: job.residentId, archived: { $ne: true }, startDate: { $lte: job.date }, endDate: { $gt: job.date }, $or: [{ subscriptionId: job.subscriptionId }, { subscriptionId: { $exists: false } }] });
+    if (activePause) throw new ApiError(409, 'This delivery date is paused');
     if (data.deliveredQuantity > job.orderedQuantity || data.deliveredQuantity < job.deliveredQuantity) throw new ApiError(400, 'Delivered count must increase within ordered quantity');
     if ((data.status === 'delivered' && data.deliveredQuantity !== job.orderedQuantity) || (data.status === 'partial' && (data.deliveredQuantity === 0 || data.deliveredQuantity === job.orderedQuantity)) || (['missed', 'publication-cancelled'].includes(data.status) && data.deliveredQuantity !== 0)) throw new ApiError(400, 'Outcome does not match delivered quantity');
     const tx = client.startSession(); let updated;
     try { await tx.withTransaction(async () => {
-      updated = await collection('deliveries').findOneAndUpdate({ id: job.id, societyId: scope.societyId, revision: data.revision, invoiceId: { $exists: false } }, { $set: { status: data.status, deliveredQuantity: data.deliveredQuantity, billableQuantity: data.deliveredQuantity }, $inc: { revision: 1 } }, { session: tx, returnDocument: 'after', projection: { _id: 0 } });
+      updated = await collection('deliveries').findOneAndUpdate({ id: job.id, societyId: scope.societyId, revision: data.revision, invoiceId: { $exists: false }, complaintResolved: { $ne: true } }, { $set: { status: data.status, deliveredQuantity: data.deliveredQuantity, billableQuantity: data.deliveredQuantity }, $inc: { revision: 1 } }, { session: tx, returnDocument: 'after', projection: { _id: 0 } });
       if (!updated) throw new ApiError(409, 'Delivery changed. Refresh and retry.');
       await db.collection('deliveryEvents').insertOne({ id: randomUUID(), societyId: scope.societyId, deliveryId: job.id, userId: scope.userId, ...data, at: new Date() }, { session: tx });
     }); } finally { await tx.endSession(); }

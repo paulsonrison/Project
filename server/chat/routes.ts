@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import type { AccessScope } from '../../shared/contracts.js';
@@ -10,14 +10,19 @@ export function chatRoutes({ db, config }: Dependencies) {
   const router = Router();
   const limit = rateLimit({ windowMs: 60000, limit: 10, keyGenerator: (_req, res) => res.locals.scope.userId, standardHeaders: 'draft-8', legacyHeaders: false });
   const filter = (scope: AccessScope) => ({ societyId: scope.societyId, userId: scope.userId });
+  async function accessKey(scope: AccessScope) {
+    const assignments = scope.role === 'staff' ? await db.collection('subscriptions').find({ societyId: scope.societyId, staffId: scope.staffId, archived: { $ne: true } }, { projection: { _id: 0, id: 1, revision: 1 } }).sort({ id: 1 }).toArray() : [];
+    return createHash('sha256').update(JSON.stringify({ ...scope, assignments })).digest('hex');
+  }
   router.get('/threads', async (_req, res) => res.json({ items: await db.collection('chatThreads').find(filter(res.locals.scope), { projection: { _id: 0 } }).sort({ createdAt: -1 }).limit(50).toArray() }));
   router.post('/threads', async (_req, res) => {
-    const thread = { id: randomUUID(), ...filter(res.locals.scope), createdAt: new Date().toISOString() };
+    const thread = { id: randomUUID(), ...filter(res.locals.scope), accessKey: await accessKey(res.locals.scope), createdAt: new Date().toISOString() };
     await db.collection('chatThreads').insertOne(thread); res.status(201).json(thread);
   });
   router.get('/threads/:id', async (req, res) => {
     const owned = { ...filter(res.locals.scope), id: req.params.id };
     if (!await db.collection('chatThreads').findOne(owned)) throw new ApiError(404, 'Conversation not found');
+    if (!await db.collection('chatThreads').findOne({ ...owned, accessKey: await accessKey(res.locals.scope) })) throw new ApiError(409, 'Your permissions changed. Start a new conversation.');
     res.json({ items: await db.collection('chatMessages').find({ ...filter(res.locals.scope), threadId: req.params.id }, { projection: { _id: 0 } }).sort({ at: 1 }).limit(100).toArray() });
   });
   router.delete('/threads/:id', async (req, res) => {
@@ -29,6 +34,7 @@ export function chatRoutes({ db, config }: Dependencies) {
     const scope: AccessScope = res.locals.scope;
     const data = z.object({ threadId: z.string().uuid(), text: z.string().trim().min(1).max(4000) }).parse(req.body);
     if (!await db.collection('chatThreads').findOne({ ...filter(scope), id: data.threadId })) throw new ApiError(404, 'Conversation not found');
+    if (!await db.collection('chatThreads').findOne({ ...filter(scope), id: data.threadId, accessKey: await accessKey(scope) })) throw new ApiError(409, 'Your permissions changed. Start a new conversation.');
     const recent = await db.collection('chatMessages').find({ ...filter(scope), threadId: data.threadId }).sort({ at: -1 }).limit(12).toArray();
     const history = recent.reverse().filter(m => m.role === 'user').map(m => ({ role: 'user', content: String(m.text).slice(0, 4000) }));
     const day = new Date().toISOString().slice(0, 10);
