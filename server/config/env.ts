@@ -7,7 +7,7 @@ const schema = z.object({
   GROQ_API_KEY: z.string().optional(), GROQ_MODEL: z.string().default('qwen/qwen3.8-27b'),
 });
 export function readEnv(input: Record<string, string | undefined>) {
-  const value = schema.parse(input);
+  const value = schema.parse({ ...input, APP_ORIGIN: input.APP_ORIGIN || input.RENDER_EXTERNAL_URL });
   return { mongoUri: value.MONGODB_URI, database: value.MONGODB_DATABASE, origin: value.APP_ORIGIN, port: value.PORT, production: value.NODE_ENV === 'production', groqKey: value.GROQ_API_KEY, groqModel: value.GROQ_MODEL };
 }
 export type Config = ReturnType<typeof readEnv>;
