@@ -2,6 +2,8 @@
 
 The application serves the built frontend and API from one Node process. `render.yaml` requests a **free** Render web service; it creates no paid database or disk. Reuse the existing free MongoDB Atlas cluster with a dedicated application database and least-privilege readWrite user. Groq usage is subject to its own account limits; never enable paid capacity without the owner's approval.
 
+For the current pilot, Render MCP direct creation is the deployment source of truth: one free Node service in the user-confirmed Paulson's workspace, Singapore region, using `feat/presstrack-complete`. The Blueprint remains a reusable template; do not apply it in parallel and create a duplicate service. Explicitly include development dependencies during the build, because Vite and TypeScript are build tools. Disable the test MongoDB binary download at install time with MONGOMS_DISABLE_POSTINSTALL=1. The runtime uses Render's documented RENDER_EXTERNAL_URL as its origin unless APP_ORIGIN is explicitly set.
+
 ## Deploy
 
 1. Connect the Render integration/account and connect this repository. Select the feature branch for a pilot, or merge a reviewed PR before using main. Apply the Render Blueprint and confirm the service plan remains Free.

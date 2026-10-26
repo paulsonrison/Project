@@ -3,7 +3,7 @@ services:
     name: presstrack
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build && npm run build:server
+    buildCommand: npm ci --include=dev && npm run build && npm run build:server
     startCommand: npm start
     healthCheckPath: /api/health
     autoDeployTrigger: checksPass
@@ -22,3 +22,5 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: qwen/qwen3.8-27b
+      - key: MONGOMS_DISABLE_POSTINSTALL
+        value: "1"
