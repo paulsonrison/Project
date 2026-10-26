@@ -14,6 +14,8 @@ export async function createIndexes(db: Db) {
   }
   await db.collection('chatMessages').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   await db.collection('idempotency').createIndex({ societyId: 1, key: 1 }, { unique: true });
+  await db.collection('chatQuotas').createIndex({ societyId: 1, day: 1 }, { unique: true });
+  await db.collection('paymentAllocations').createIndex({ societyId: 1, invoiceId: 1, paymentId: 1 });
 }
 export async function connect(config: Config) {
   const client = await new MongoClient(config.mongoUri, { serverSelectionTimeoutMS: 10000 }).connect();

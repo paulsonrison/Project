@@ -38,6 +38,20 @@ export function authRoutes(db: Db, client: MongoClient, config: Config) {
     if (!member) throw new ApiError(403, 'No active membership');
     await session(res, user.id, member.societyId); res.json({ ok: true });
   });
+  router.post('/accept-invitation', limiter, async (req, res) => {
+    const data = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/), name: z.string().trim().min(1).max(100), password: z.string().min(12).max(128) }).parse(req.body);
+    const tx = client.startSession(); let userId = '', societyId = '';
+    const passwordHash = await hashPassword(data.password);
+    try { await tx.withTransaction(async () => {
+      const invite = await db.collection('invitations').findOneAndDelete({ tokenHash: tokenHash(data.token), expiresAt: { $gt: new Date() } }, { session: tx });
+      if (!invite) throw new ApiError(400, 'Invitation expired or already used');
+      if (await db.collection('users').findOne({ email: invite.email }, { session: tx })) throw new ApiError(409, 'An account already exists for this email');
+      userId = randomUUID(); societyId = invite.societyId;
+      await db.collection('users').insertOne({ id: userId, email: invite.email, name: data.name, passwordHash }, { session: tx });
+      await db.collection('memberships').insertOne({ userId, societyId, role: invite.role, ...(invite.role === 'resident' ? { residentId: invite.residentId } : { staffId: invite.staffId }) }, { session: tx });
+    }); } finally { await tx.endSession(); }
+    await session(res, userId, societyId); res.status(201).json({ ok: true });
+  });
   router.post('/logout', async (req: Request, res: Response) => {
     const token = req.cookies?.presstrack_session;
     if (token) await db.collection('sessions').deleteOne({ tokenHash: tokenHash(token) });

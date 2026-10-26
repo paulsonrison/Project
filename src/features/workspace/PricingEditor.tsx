@@ -1,0 +1,17 @@
+import { useState, type FormEvent } from 'react';
+import { save, money, type PublicationRow } from '../../services/api';
+import { useData } from './useData';
+export default function PricingEditor() {
+  const data = useData('/publications'), [selected, setSelected] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const paper = data.items.find(p => p.id === selected) as PublicationRow | undefined;
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault(); if (!paper) return;
+    const form = new FormData(e.currentTarget), kind = String(form.get('kind')), price = Math.round(Number(form.get('price')) * 100);
+    const changes: Record<string, unknown> = { revision: paper.revision };
+    if (kind === 'month') { const value = String(form.get('month')); changes.monthlyPrices = [...(paper.monthlyPrices ?? []).filter(r => r.yearMonth !== value), { yearMonth: value, price }]; }
+    else if (kind === 'weekday') { const value = Number(form.get('day')); changes.priceExceptions = [...(paper.priceExceptions ?? []).filter(r => !(r.type === 'day_of_week' && r.dayOfWeek === value)), { type: 'day_of_week', dayOfWeek: value, price }]; }
+    else { const value = String(form.get('date')); changes.priceExceptions = [...(paper.priceExceptions ?? []).filter(r => !(r.type === 'specific_date' && r.specificDate === value)), { type: 'specific_date', specificDate: value, price }]; }
+    setBusy(true); setError(''); try { await save(`/publications/${paper.id}`, changes, 'PATCH'); data.refresh(); } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
+  }
+  return <section><div className="section-intro"><div><p className="eyebrow">Edition pricing</p><h1>Special editions. Clear prices.</h1></div></div><p>Specific-date prices take priority over weekday prices, then monthly overrides, then the effective base price. Issued bills retain their original charges.</p><label>Select newspaper<select value={selected} onChange={e => setSelected(e.target.value)}><option value="">Choose a newspaper…</option>{data.items.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>{(error || data.error) && <p role="alert" className="notice error">{error || data.error}</p>}{paper && <><div className="reading"><p>Base price: {money(paper.basePrice)}</p>{paper.priceHistory?.map(r => <p key={r.effectiveDate}>From {r.effectiveDate}: {money(r.price)}</p>)}{paper.monthlyPrices?.map(r => <p key={r.yearMonth}>{r.yearMonth}: {money(r.price)} per issue</p>)}{paper.priceExceptions?.map((r, i) => <p key={i}>{r.specificDate ?? ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][r.dayOfWeek ?? 0]}: {money(r.price)}</p>)}</div><form className="editor-form" onSubmit={submit}><label>Price rule<select name="kind"><option value="weekday">Weekday edition</option><option value="month">Month override</option><option value="date">Specific date</option></select></label><label>Day of week<select name="day">{['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, n) => <option key={day} value={n}>{day}</option>)}</select></label><label>Month (for a month override)<input name="month" type="month" /></label><label>Date (for a specific-date exception)<input name="date" type="date" /></label><label>Price per issue (₹)<input name="price" type="number" min="0" step="0.01" required /></label><button className="button primary" disabled={busy}>{busy ? 'Saving…' : 'Save price rule'}</button></form></>}</section>;
+}

@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({ testDir: './tests/e2e', use: { baseURL: 'http://127.0.0.1:5173' }, webServer: [{ command: 'node node_modules/tsx/dist/cli.mjs tests/dev-server.ts', url: 'http://127.0.0.1:3001/api/health', timeout: 60000, reuseExistingServer: true }, { command: 'node node_modules/vite/bin/vite.js --host 127.0.0.1 --strictPort', url: 'http://127.0.0.1:5173', reuseExistingServer: true }] });
