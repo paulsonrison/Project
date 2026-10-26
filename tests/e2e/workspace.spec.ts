@@ -28,6 +28,6 @@ test('society onboarding, resident persistence and private assistant states', as
   await page.getByRole('button', { name: 'Toggle navigation' }).click();
   await expect(page.getByRole('link', { name: 'Residents', exact: false })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.getByRole('button', { name: 'Close navigation', exact: true }).click();
+  await page.getByRole('button', { name: 'Close navigation menu', exact: true }).click();
   await page.screenshot({ path: testInfo.outputPath('chat-mobile.png'), fullPage: true, animations: 'disabled' });
 });

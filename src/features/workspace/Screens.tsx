@@ -60,7 +60,3 @@ export function RequestPauseForm({ residentId, onDone }: { residentId: string; o
   async function submit(e: FormEvent<HTMLFormElement>) { e.preventDefault(); const form = new FormData(e.currentTarget); try { await save('/pauses', { residentId, startDate: form.get('start'), endDate: form.get('end'), reason: 'Holiday' }); onDone(); } catch (err) { setError((err as Error).message); } }
   return <form className="editor-form" onSubmit={submit}><label>Pause from<input name="start" type="date" required /></label><label>Resume on<input name="end" type="date" required /></label>{error && <p role="alert">{error}</p>}<button className="button primary">Request pause</button></form>;
 }
-
-
-
-

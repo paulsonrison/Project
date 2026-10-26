@@ -11,4 +11,3 @@ export function readEnv(input: Record<string, string | undefined>) {
   return { mongoUri: value.MONGODB_URI, database: value.MONGODB_DATABASE, origin: value.APP_ORIGIN, port: value.PORT, production: value.NODE_ENV === 'production', groqKey: value.GROQ_API_KEY, groqModel: value.GROQ_MODEL };
 }
 export type Config = ReturnType<typeof readEnv>;
-

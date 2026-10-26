@@ -22,4 +22,3 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: qwen/qwen3.8-27b
-
