@@ -7,12 +7,12 @@ Implementation branch: `feat/owner-excel-workflow`, based on `origin/feat/presst
 ## Progress
 
 1. Baseline: main's dependencies were replaced with the deployed branch's locked dependencies. Initial runtime dependency audit had no advisories. Existing eight MongoDB integration tests passed when allowed to launch the local disposable database; restricted execution caused MongoDB startup failure before assertions.
-2. Owner workflow: implemented staff-free subscriptions, Today and catalog navigation, reviewed batch delivery confirmation; verification in progress.
+2. Owner workflow: implemented staff-free subscriptions, Today and catalog navigation, reviewed batch delivery confirmation; local and hosted verification passed.
 3. Rates: bounded intervals, preview/commit, daily history and immutable billed snapshots implemented; new unit and transaction tests pass.
-4. Imports: server-side reviewed changes, transactional commit, contextual workbook download/upload and four mode UI implemented; extended regression/security review in progress.
+4. Imports: server-side reviewed changes, transactional commit, contextual workbook download/upload and four mode UI implemented; regression/security review and hosted import passed.
 5. AI: reviewed Groq entry proposals implemented. The user explicitly restricted external requests to nonpersonal newspaper choices. Customer names, flats, addresses and phones stay on PressTrack's save path; the Groq endpoint rejects those fields. Existing chat now sends canonical intent plus numeric/date/status data instead of raw questions, private record fields or conversation history.
-6. Languages: English/Hindi/Malayalam provider, translated screens, selector and font support implemented; browser verification in progress. Native-speaker review has not occurred.
-7. Deployment: not yet published. Keep existing Render service, MongoDB and secrets. No local secret copied or exposed.
+6. Languages: English/Hindi/Malayalam provider, translated screens, selector and font support implemented; browser verification passed. Native-speaker review has not occurred.
+7. Deployment: live on the existing Render service, using its existing MongoDB connection and Groq secret. No local secret copied or exposed.
 
 ## Implementation choices
 
@@ -25,7 +25,7 @@ Keep society IDs as the business isolation key; admin is the owner. Preserve leg
 - Review dependency advisories introduced by workbook tooling.
 - Review financial-data changes, deployment backups/migration compatibility and staged live smoke checks.
 
-This ledger records work in progress, not a completion claim.
+Release results are recorded below; remaining pilot limitations are explicitly retained.
 
 ## Release verification — 27 October 2026
 
@@ -37,4 +37,12 @@ A synthetic 5,000-row, 9-column workbook build+parse completed locally in 1.90 s
 
 Native-speaker review remains outstanding; uncommon dynamic errors fall back to English. Fixed monthly fee plans, an offline workflow and advanced per-customer schedule sheets are not part of this release. The pilot continues to use actual delivered copies and existing publication schedules. No destructive data backfill is required; interval migration happens only when an owner reviews and confirms a rate change. Database restore rehearsal remains an operational pilot requirement rather than a completed claim.
 
-Final local release checks: **71 tests passed across 20 files**, frontend/server TypeScript checks passed, ESLint passed, frontend/server production builds passed, `git diff --check` passed, and production dependency audit reported **zero vulnerabilities**. Six browser tests passed before the final small credit/locale additions; final browser rerun is in progress. Independent scoped re-review approved the debit-reversal invariant and found no remaining blocking issue. The deploy branch remained at `bb683ba` when fetched immediately before integration.
+Final local release checks: **71 tests passed across 20 files**, **all six browser tests passed in the final rerun**, frontend/server TypeScript checks passed, ESLint passed, frontend/server production builds passed, `git diff --check` passed, and production dependency audit reported **zero vulnerabilities**. Independent scoped re-review approved the debit-reversal invariant and found no remaining blocking issue. The deploy branch remained at `bb683ba` when fetched immediately before integration.
+
+## Published release and hosted verification
+
+[PR #26](https://github.com/paulsonrison/Project/pull/26) merged implementation `9bb1c2818a58a629aac910d2d7c934f67571c777` into the existing deploy branch as `c29613848fafd5c9b2a3c7e1ab6b6f8a6545a162`. GitHub's verify check passed for the implementation revision. Render deploy `dep-dbg0ufpsrm7s73c6bqr0` became **live** on 27 October 2026 at [the existing app](https://presstrack-paulson.onrender.com). No new infrastructure was created; auto-deploy remains off.
+
+The user separately approved an isolated synthetic hosted business test. **All 26 hosted assertions passed**: health readiness, anonymous access rejection, foreign-origin rejection, owner registration, publication creation, Malayalam workbook download, Excel upload/preview/commit, staff-free subscription, delivery confirmation, exact-copy bill creation, invoice issue/payment, dated rate preview/save, daily history and preservation of the paid bill's original price, public-only AI payload review, live Groq synthetic proposal, and archival of the synthetic customer/publication after verification. The synthetic invoice/payment history remains in that isolated test business as explicitly approved; no real customer's records were used or modified. The session was logged out.
+
+Automatic approval initially blocked a production synthetic-write test. It proceeded only after the user's explicit approval of the exact isolated test workflow. The earlier AI export restriction was resolved by the user's nonpersonal-data-only authorization and strict payload separation, not by sending customer descriptions to the provider.
