@@ -80,7 +80,7 @@ export async function buildWorkbook(context: WorkbookContext): Promise<Buffer> {
   }
   return Buffer.from(await book.xlsx.writeBuffer());
 }
-function checkZip(buffer: Buffer) {
+export function checkZip(buffer: Buffer,inspect?:(name:string,contents:Buffer)=>void) {
   if (buffer.length > 10 * 1024 * 1024 || buffer.readUInt32LE(0) !== 0x04034b50) throw new ApiError(400, 'Upload an .xlsx workbook smaller than 10 MB');
   const invalid=()=>new ApiError(400,'Invalid or unsupported workbook archive');
   // Read the actual central directory rather than scanning payload bytes for signatures.
@@ -107,7 +107,8 @@ function checkZip(buffer: Buffer) {
     try {
       const raw=buffer.subarray(start,finish),contents=method===0?raw:inflateRawSync(raw,{maxOutputLength:Math.max(1,expanded)});
       if(contents.length!==expanded)throw invalid();
-    }catch{throw invalid();}
+      inspect?.(name,contents);
+    }catch(error){if(error instanceof ApiError)throw error;throw invalid();}
     cursor+=46+nameLength+extraLength+commentLength;
   }
   if(cursor!==end)throw invalid();

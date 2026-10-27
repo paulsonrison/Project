@@ -4,8 +4,9 @@ import ChatView from '../features/workspace/ChatView';
 import ComplaintsView from '../features/workspace/ComplaintsView';
 import PricingEditor from '../features/workspace/PricingEditor';
 import Dashboard from '../features/workspace/Dashboard';
+import PreferencesPanel from '../features/settings/PreferencesPanel';
 import { AboutScreen, ContactScreen, PublicHome, SignInScreen } from '../features/workspace/PublicScreens';
-import { BillingScreen, DeliveryScreen, LedgerScreen, PausesScreen, ResidentsScreen, SettingsScreen, SubscriptionsScreen } from '../features/workspace/Screens';
+import { BillingScreen, DeliveryScreen, LedgerScreen, PausesScreen, ResidentsScreen, SettingsScreen, SubscriptionsScreen, ServicePoliciesScreen } from '../features/workspace/Screens';
 
 const AppRouter = () => {
   return (
@@ -21,7 +22,8 @@ const AppRouter = () => {
         <Route path="/today" element={<DeliveryScreen />} />
         <Route path="/delivery-boy" element={<Navigate to="/today" replace />} />
         <Route path="/newspapers" element={<SettingsScreen />} />
-        <Route path="/settings" element={<SettingsScreen initialTab="policies" />} />
+        <Route path="/settings" element={<PreferencesPanel />} />
+        <Route path="/service-policies" element={<ServicePoliciesScreen />} />
         <Route path="/residents" element={<ResidentsScreen />} />
         <Route path="/subscriptions" element={<SubscriptionsScreen />} />
         <Route path="/pauses" element={<PausesScreen />} />

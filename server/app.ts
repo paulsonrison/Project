@@ -19,6 +19,8 @@ import { importRoutes } from './imports/routes.js';
 import { ratesRoutes } from './rates/routes.js';
 import { validateRateIntervals } from './rates/intervals.js';
 import { aiEntryRoutes } from './ai-entry/routes.js';
+import {preferencesRoutes} from './preferences/routes.js';
+import {uploadRoutes} from './uploads/routes.js';
 
 export interface Dependencies { db: Db; client: MongoClient; config: Config }
 export function createApp({ db, client, config }: Dependencies) {
@@ -33,7 +35,7 @@ export function createApp({ db, client, config }: Dependencies) {
   app.set('trust proxy', 1);
   app.use(helmet({ contentSecurityPolicy: { directives: { 'font-src': ["'self'", 'https://fonts.gstatic.com'], 'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'] } } }));
   const smallJson = express.json({ limit: '32kb' });
-  app.use((req,res,next)=>req.path==='/api/v1/imports/preview'?next():smallJson(req,res,next)); app.use(cookieParser());
+  app.use((req,res,next)=>req.path==='/api/v1/imports/preview'||/^\/api\/v1\/uploads\/[^/]+\/preview$/.test(req.path)?next():smallJson(req,res,next)); app.use(cookieParser());
   app.use((req, res, next) => {
     res.locals.requestId = randomUUID();
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.path.startsWith('/api/') && req.get('origin') !== new URL(config.origin).origin) return next(new ApiError(403, 'Request origin rejected'));
@@ -59,6 +61,8 @@ export function createApp({ db, client, config }: Dependencies) {
   app.use('/api/v1/imports', importRoutes({ db, client, config }));
   app.use('/api/v1/rates', ratesRoutes({ db, client, config }));
   app.use('/api/v1/ai-entry', aiEntryRoutes({ db, client, config }));
+  app.use('/api/v1/preferences',preferencesRoutes({db,client,config}));
+  app.use('/api/v1/uploads',uploadRoutes({db,client,config}));
   for (const resource of Object.keys(schemas) as Resource[]) {
     app.get(`/api/v1/${resource}`, async (req, res) => {
       const scope: AccessScope = res.locals.scope;
