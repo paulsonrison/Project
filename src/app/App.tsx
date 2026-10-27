@@ -1,12 +1,13 @@
 import { BrowserRouter } from "react-router";
 import AppRouter from "./AppRouter";
+import { I18nProvider } from "../i18n";
 
 function App() {
 
   return (
-    <BrowserRouter>
+    <I18nProvider><BrowserRouter>
     <AppRouter />
-    </BrowserRouter>
+    </BrowserRouter></I18nProvider>
   );
 }
 

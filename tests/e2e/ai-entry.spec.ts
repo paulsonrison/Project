@@ -1,0 +1,12 @@
+import {test,expect} from '@playwright/test';
+import {acceptDefaultSetup} from './helpers';
+test('first-use defaults and settings stay simple, keys are optional and language persists',async({page})=>{
+ await page.goto('/signin?mode=register');await page.getByLabel('Your name').fill('Settings Owner');await page.getByLabel('Email address').fill(`settings-${Date.now()}@example.test`);await page.getByLabel('Society / business name').fill('Settings Round');await page.getByLabel('Password',{exact:true}).fill('settings-owner-password-123');await page.getByRole('button',{name:'Create workspace'}).click();
+ const setup=page.getByRole('dialog',{name:'Set up your business',exact:true});await expect(setup.getByLabel('Use included AI',{exact:true})).toBeChecked();await expect(setup.getByLabel('Groq API key',{exact:true})).toHaveCount(0);await acceptDefaultSetup(page);
+ await page.locator('.sidebar').getByRole('link',{name:'Settings',exact:false}).click();await expect(page.getByRole('heading',{name:'Preferences',exact:true})).toBeVisible();await page.getByLabel('Use my own API key',{exact:true}).check();await expect(page.getByLabel('Groq API key',{exact:true})).toHaveAttribute('type','password');await page.getByLabel('Groq API key',{exact:true}).fill('gsk_synthetic_test_secret');
+ await page.route('**/api/v1/preferences/ai-key/test',route=>route.fulfill({status:400,json:{error:{message:'This key could not be verified.'}}}));await page.getByRole('button',{name:'Test key',exact:true}).click();await expect(page.getByRole('alert')).toContainText('This key could not be verified.');
+ expect(await page.evaluate(()=>JSON.stringify(localStorage))).not.toContain('gsk_synthetic_test_secret');
+ await page.getByLabel('Use included AI',{exact:true}).check();await page.getByRole('button',{name:'Save settings',exact:true}).click();await expect(page.getByRole('status')).toContainText('Settings saved.');
+ await page.reload();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByLabel('Use included AI',{exact:true})).toBeChecked();
+ await page.locator('.workspace-header').getByRole('combobox').selectOption('hi-IN');await expect(page.locator('html')).toHaveAttribute('lang','hi-IN');await expect.poll(async()=>(await(await page.request.get('/api/v1/preferences')).json()).locale).toBe('hi-IN');await page.reload();await expect(page.locator('html')).toHaveAttribute('lang','hi-IN');
+});

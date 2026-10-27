@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: presstrack
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build && npm run build:server
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: MONGODB_DATABASE
+        value: presstrack
+      - key: MONGODB_URI
+        sync: false
+      - key: APP_ORIGIN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: qwen/qwen3.8-27b
+      - key: MONGOMS_DISABLE_POSTINSTALL
+        value: "1"

@@ -1,33 +1,38 @@
 import { Navigate, Route, Routes } from "react-router";
-import Home from "../pages/home";
-import AboutUs from "../pages/AboutUs";
-import ContactUs from "../pages/ContactUs";
-import SignIn from "../pages/SignIn";
-import Billing from "../pages/Billing";
-import Calendar from "../pages/Calendar";
-import DeliveryBoy from "../pages/DeliveryBoy";
-import Settings from "../pages/Settings";
-import Residents from "../pages/Residents";
-import PageLayout from "../components/layout/PageLayout";
-import PublicLayout from "../components/layout/PublicLayout";
+import AppShell from '../features/workspace/AppShell';
+import ChatView from '../features/workspace/ChatView';
+import ComplaintsView from '../features/workspace/ComplaintsView';
+import PricingEditor from '../features/workspace/PricingEditor';
+import Dashboard from '../features/workspace/Dashboard';
+import PreferencesPanel from '../features/settings/PreferencesPanel';
+import { AboutScreen, ContactScreen, PublicHome, SignInScreen } from '../features/workspace/PublicScreens';
+import { BillingScreen, DeliveryScreen, LedgerScreen, PausesScreen, ResidentsScreen, SettingsScreen, SubscriptionsScreen, ServicePoliciesScreen } from '../features/workspace/Screens';
 
 const AppRouter = () => {
   return (
     <Routes>
-      <Route element={<PublicLayout/>}>
-        <Route path="/home" element={<Home />} />
-        <Route path="/about-us" element={<AboutUs />} />
-        <Route path="/contact-us" element={<ContactUs />} />
-        <Route path="/signin" element={<SignIn />} />
+      <Route path="/home" element={<PublicHome />} />
+      <Route path="/about-us" element={<AboutScreen />} />
+      <Route path="/contact-us" element={<ContactScreen />} />
+      <Route path="/signin" element={<SignInScreen />} />
+      <Route element={<AppShell />}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/billing" element={<BillingScreen />} />
+        <Route path="/calendar" element={<DeliveryScreen calendar />} />
+        <Route path="/today" element={<DeliveryScreen />} />
+        <Route path="/delivery-boy" element={<Navigate to="/today" replace />} />
+        <Route path="/newspapers" element={<SettingsScreen />} />
+        <Route path="/settings" element={<PreferencesPanel />} />
+        <Route path="/service-policies" element={<ServicePoliciesScreen />} />
+        <Route path="/residents" element={<ResidentsScreen />} />
+        <Route path="/subscriptions" element={<SubscriptionsScreen />} />
+        <Route path="/pauses" element={<PausesScreen />} />
+        <Route path="/payments" element={<LedgerScreen />} />
+        <Route path="/chat" element={<ChatView />} />
+        <Route path="/complaints" element={<ComplaintsView />} />
+        <Route path="/pricing" element={<PricingEditor />} />
       </Route>
-      <Route element={<PageLayout />}>
-        <Route path="/billing" element={<Billing />} />
-        <Route path="/calendar" element={<Calendar />} />
-        <Route path="/delivery-boy" element={<DeliveryBoy />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/residents" element={<Residents />} />
-        <Route path="*" element={<Navigate to="/home" replace />} />
-      </Route>
+      <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>
   );
 };
