@@ -18,8 +18,10 @@ const AppRouter = () => {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/billing" element={<BillingScreen />} />
         <Route path="/calendar" element={<DeliveryScreen calendar />} />
-        <Route path="/delivery-boy" element={<DeliveryScreen />} />
-        <Route path="/settings" element={<SettingsScreen />} />
+        <Route path="/today" element={<DeliveryScreen />} />
+        <Route path="/delivery-boy" element={<Navigate to="/today" replace />} />
+        <Route path="/newspapers" element={<SettingsScreen />} />
+        <Route path="/settings" element={<SettingsScreen initialTab="policies" />} />
         <Route path="/residents" element={<ResidentsScreen />} />
         <Route path="/subscriptions" element={<SubscriptionsScreen />} />
         <Route path="/pauses" element={<PausesScreen />} />

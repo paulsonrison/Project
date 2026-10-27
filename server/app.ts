@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { ZodError } from 'zod';
-import type { Db, MongoClient } from 'mongodb';
+import type { Db, MongoClient, ClientSession } from 'mongodb';
 import type { AccessScope } from '../shared/contracts.js';
 import type { Config } from './config/env.js';
 import { authRoutes, tokenHash } from './auth/routes.js';
@@ -15,20 +15,25 @@ import { operations } from './features/operations.js';
 import { memberships } from './features/memberships.js';
 import { chatRoutes } from './chat/routes.js';
 import { complaintRoutes } from './features/complaints.js';
+import { importRoutes } from './imports/routes.js';
+import { ratesRoutes } from './rates/routes.js';
+import { validateRateIntervals } from './rates/intervals.js';
+import { aiEntryRoutes } from './ai-entry/routes.js';
 
 export interface Dependencies { db: Db; client: MongoClient; config: Config }
 export function createApp({ db, client, config }: Dependencies) {
   const app = express();
-  async function validateReferences(data: Record<string, unknown>, scope: AccessScope) {
+  async function validateReferences(data: Record<string, unknown>, scope: AccessScope, session?:ClientSession) {
     const refs = { residentId: 'residents', publicationId: 'publications', staffId: 'staff', subscriptionId: 'subscriptions', deliveryId: 'deliveries' };
     for (const [key, collection] of Object.entries(refs)) {
       const reference = data[key];
-      if (reference && !await db.collection(collection).findOne({ id: reference, societyId: scope.societyId, archived: { $ne: true } })) throw new ApiError(400, `Invalid ${key}`);
+      if (reference && !await db.collection(collection).findOne({ id: reference, societyId: scope.societyId, archived: { $ne: true } },{session})) throw new ApiError(400, `Invalid ${key}`);
     }
   }
   app.set('trust proxy', 1);
   app.use(helmet({ contentSecurityPolicy: { directives: { 'font-src': ["'self'", 'https://fonts.gstatic.com'], 'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'] } } }));
-  app.use(express.json({ limit: '32kb' })); app.use(cookieParser());
+  const smallJson = express.json({ limit: '32kb' });
+  app.use((req,res,next)=>req.path==='/api/v1/imports/preview'?next():smallJson(req,res,next)); app.use(cookieParser());
   app.use((req, res, next) => {
     res.locals.requestId = randomUUID();
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.path.startsWith('/api/') && req.get('origin') !== new URL(config.origin).origin) return next(new ApiError(403, 'Request origin rejected'));
@@ -51,6 +56,9 @@ export function createApp({ db, client, config }: Dependencies) {
     const society = await db.collection('societies').findOne({ id: scope.societyId }, { projection: { _id: 0 } });
     res.json({ ...scope, ...user, society });
   });
+  app.use('/api/v1/imports', importRoutes({ db, client, config }));
+  app.use('/api/v1/rates', ratesRoutes({ db, client, config }));
+  app.use('/api/v1/ai-entry', aiEntryRoutes({ db, client, config }));
   for (const resource of Object.keys(schemas) as Resource[]) {
     app.get(`/api/v1/${resource}`, async (req, res) => {
       const scope: AccessScope = res.locals.scope;
@@ -68,17 +76,24 @@ export function createApp({ db, client, config }: Dependencies) {
       const scope: AccessScope = res.locals.scope;
       if (['pauses', 'complaints'].includes(resource)) requireRole(scope, 'admin', 'resident'); else requireRole(scope, 'admin');
       const data = schemas[resource].parse(req.body);
+      if(resource==='publications' && 'rateIntervals' in data && data.rateIntervals) validateRateIntervals(data.rateIntervals);
       if ('startDate' in data) validRange(data);
       if (scope.role === 'resident' && 'residentId' in data && data.residentId !== scope.residentId) throw new ApiError(403, 'Forbidden');
-      await validateReferences(data, scope);
+      const guard=db.collection<{_id:string;revision:number}>('importGuards');
+      await guard.updateOne({_id:scope.societyId},{$setOnInsert:{revision:0}},{upsert:true});
+      const tx=client.startSession();
+      const entity = { ...data, id: randomUUID(), societyId: scope.societyId, revision: 0, createdAt: new Date().toISOString() };
+      try { await tx.withTransaction(async()=>{
+      await guard.updateOne({_id:scope.societyId},{$inc:{revision:1}},{session:tx});
+      await validateReferences(data, scope,tx);
       if (resource === 'pauses' && 'residentId' in data && 'subscriptionId' in data && data.subscriptionId) {
-        if (!await db.collection('subscriptions').findOne({ societyId: scope.societyId, id: data.subscriptionId, residentId: data.residentId })) throw new ApiError(400, 'Pause subscription does not belong to this resident');
+        if (!await db.collection('subscriptions').findOne({ societyId: scope.societyId, id: data.subscriptionId, residentId: data.residentId },{session:tx})) throw new ApiError(400, 'Pause subscription does not belong to this resident');
       }
       if (resource === 'complaints' && 'deliveryId' in data && 'residentId' in data) {
-        if (!await db.collection('deliveries').findOne({ societyId: scope.societyId, id: data.deliveryId, residentId: data.residentId })) throw new ApiError(400, 'Delivery does not belong to this resident');
+        if (!await db.collection('deliveries').findOne({ societyId: scope.societyId, id: data.deliveryId, residentId: data.residentId },{session:tx})) throw new ApiError(400, 'Delivery does not belong to this resident');
       }
       if (resource === 'subscriptions' && 'residentId' in data && 'publicationId' in data) {
-        const overlapping = await db.collection('subscriptions').find({ societyId: scope.societyId, residentId: data.residentId, publicationId: data.publicationId, archived: { $ne: true } }).toArray();
+        const overlapping = await db.collection('subscriptions').find({ societyId: scope.societyId, residentId: data.residentId, publicationId: data.publicationId, archived: { $ne: true } },{session:tx}).toArray();
         if (overlapping.some(s => ('endDate' in data ? data.endDate ?? '9999-12-31' : '9999-12-31') > s.startDate && (s.endDate ?? '9999-12-31') > ('startDate' in data ? data.startDate : ''))) throw new ApiError(409, 'An overlapping subscription already exists');
       }
       if (resource === 'pauses' && 'startDate' in data) {
@@ -87,11 +102,11 @@ export function createApp({ db, client, config }: Dependencies) {
         const earliest = new Date(`${today}T12:00:00Z`); earliest.setUTCDate(earliest.getUTCDate() + (hour >= 18 ? 2 : 1));
         if (data.startDate < earliest.toISOString().slice(0, 10)) throw new ApiError(400, `Pause requests must start on or after ${earliest.toISOString().slice(0, 10)} (18:00 cutoff)`);
       }
-      const entity = { ...data, id: randomUUID(), societyId: scope.societyId, revision: 0, createdAt: new Date().toISOString() };
-      await db.collection(resource).insertOne(entity);
+      await db.collection(resource).insertOne(entity,{session:tx});
       if (resource === 'pauses' && 'startDate' in data && 'endDate' in data && 'residentId' in data) {
-        await db.collection('deliveries').updateMany({ societyId: scope.societyId, residentId: data.residentId, ...('subscriptionId' in data && data.subscriptionId ? { subscriptionId: data.subscriptionId } : {}), date: { $gte: data.startDate, $lt: data.endDate }, invoiceId: { $exists: false }, status: { $in: ['pending', 'paused'] } }, { $set: { status: 'paused', billableQuantity: 0 }, $inc: { revision: 1 } });
+        await db.collection('deliveries').updateMany({ societyId: scope.societyId, residentId: data.residentId, ...('subscriptionId' in data && data.subscriptionId ? { subscriptionId: data.subscriptionId } : {}), date: { $gte: data.startDate, $lt: data.endDate }, invoiceId: { $exists: false }, status: { $in: ['pending', 'paused'] } }, { $set: { status: 'paused', billableQuantity: 0 }, $inc: { revision: 1 } },{session:tx});
       }
+      }); } finally {await tx.endSession();}
       res.status(201).json(entity);
     });
     app.patch(`/api/v1/${resource}/:id`, async (req, res) => {
@@ -99,8 +114,10 @@ export function createApp({ db, client, config }: Dependencies) {
       const existing = await db.collection<Entity>(resource).findOne({ id: req.params.id, societyId: scope.societyId });
       if (!existing) throw new ApiError(404, 'Record not found');
       const revision = Number(req.body.revision);
+      if(resource==='publications' && ['rateIntervals','pricingVersion','priceHistory'].some(key=>key in req.body)) throw new ApiError(400,'Use the reviewed rate change workflow to update rate history');
       if (!Number.isInteger(revision) || revision !== existing.revision) throw new ApiError(409, 'This record changed. Refresh and retry.');
       const data = schemas[resource].parse({ ...existing, ...req.body });
+      if(resource==='publications' && 'rateIntervals' in data && data.rateIntervals) validateRateIntervals(data.rateIntervals);
       if ('startDate' in data) validRange(data);
       await validateReferences(data, scope);
       if (resource === 'subscriptions') {
@@ -109,6 +126,7 @@ export function createApp({ db, client, config }: Dependencies) {
         if ('endDate' in data && data.endDate && await db.collection('deliveries').findOne({ societyId: scope.societyId, subscriptionId: existing.id, date: { $gte: data.endDate }, invoiceId: { $exists: true } })) throw new ApiError(409, 'Stop date cannot remove billed deliveries');
       }
       if (resource === 'publications' && 'basePrice' in data && data.basePrice !== existing.basePrice) {
+        if(existing.pricingVersion===2) throw new ApiError(400,'Use Rate history to preview and confirm a dated rate change');
         if (!data.effectiveDate) throw new ApiError(400, 'Specify an effective date for a price change');
         const latestBilled = await db.collection('deliveries').findOne({ societyId: scope.societyId, publicationId: existing.id, invoiceId: { $exists: true }, date: { $gte: data.effectiveDate } });
         if (latestBilled) throw new ApiError(409, 'Price changes cannot rewrite billed delivery dates');
@@ -137,8 +155,9 @@ export function createApp({ db, client, config }: Dependencies) {
   app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     void _next;
     const duplicate = typeof err === 'object' && err && 'code' in err && err.code === 11000;
-    const status = err instanceof ApiError ? err.status : err instanceof ZodError ? 400 : duplicate ? 409 : 500;
-    const message = err instanceof ApiError ? err.message : err instanceof ZodError ? err.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ') : duplicate ? 'This record already exists' : 'Unable to complete request';
+    const expected = err instanceof Error && /Missing rate|Rate intervals overlap|Rate end|rate revision/.test(err.message);
+    const status = err instanceof ApiError ? err.status : err instanceof ZodError ? 400 : duplicate || expected ? 409 : err instanceof Error && err.name === 'MulterError' ? 400 : 500;
+    const message = err instanceof ApiError || expected ? (err as Error).message : err instanceof ZodError ? err.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ') : duplicate ? 'This record already exists' : status===400 ? 'Workbook exceeds the upload limits' : 'Unable to complete request';
     if (status === 500) console.error('Request failed', res.locals.requestId, err instanceof Error ? err.name : 'UnknownError');
     res.status(status).json({ error: { code: String(status), message, requestId: res.locals.requestId } });
   });

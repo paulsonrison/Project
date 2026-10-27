@@ -7,7 +7,7 @@ import type { Entity } from '../db/connect.js';
 import { ApiError, requireRole, visibleFilter } from '../auth/scope.js';
 import { date, month } from './schemas.js';
 import { getServiceDates, resolvePrice, invoiceTotal } from '../domain/rules.js';
-import { ledgerSnapshot } from '../domain/ledger.js';
+import { ledgerSnapshot, releaseAllocations } from '../domain/ledger.js';
 import { deliveryFilter } from '../auth/deliveryFilter.js';
 
 export function operations({ db, client }: Dependencies) {
@@ -25,15 +25,18 @@ export function operations({ db, client }: Dependencies) {
       await collection('deliveries').updateMany({ societyId: scope.societyId, subscriptionId: sub.id, invoiceId: { $exists: false }, date: { $gte: `${ym}-01`, $lt: `${ym}-32`, $nin: dates }, status: { $in: ['pending', 'paused'] } }, { $set: { status: 'publication-cancelled', cancellationReason: 'subscription-ineligible', billableQuantity: 0 }, $inc: { revision: 1 } });
       for (const serviceDate of dates) {
         const paused = pauses.some(p => serviceDate >= p.startDate && serviceDate < p.endDate) || (sub.archived && serviceDate >= sub.archivedDate) || (paper.archived && serviceDate >= paper.archivedDate) || (resident.archived && serviceDate >= resident.archivedDate);
-        await collection('deliveries').updateOne({ societyId: scope.societyId, subscriptionId: sub.id, date: serviceDate }, { $setOnInsert: {
+        const key={societyId:scope.societyId,subscriptionId:sub.id,date:serviceDate};
+        const existing=await collection('deliveries').findOne(key);
+        if(!existing) await collection('deliveries').updateOne(key, { $setOnInsert: {
           id: randomUUID(), societyId: scope.societyId, subscriptionId: sub.id, residentId: sub.residentId,
-          staffId: sub.staffId, publicationId: sub.publicationId, publicationName: paper.name,
+          ...(sub.staffId?{staffId:sub.staffId}:{}), publicationId: sub.publicationId, publicationName: paper.name,
           residentName: resident.name, unit: resident.unit, address: resident.address, instructions: resident.instructions,
           routeOrder: sub.routeOrder, date: serviceDate, status: paused ? 'paused' : 'pending',
           orderedQuantity: sub.quantity, deliveredQuantity: 0, billableQuantity: 0, revision: 0,
-          priceMinor: resolvePrice(paper as unknown as Publication, serviceDate),
+          priceMinor: paused?0:resolvePrice(paper as unknown as Publication, serviceDate), publicationRevision:paper.revision,
         } }, { upsert: true });
-        if (serviceDate >= future) await collection('deliveries').updateOne({ societyId: scope.societyId, subscriptionId: sub.id, date: serviceDate, invoiceId: { $exists: false }, $or: [{ status: { $in: ['pending', 'paused'] } }, { status: 'publication-cancelled', cancellationReason: 'subscription-ineligible' }] }, { $set: { status: paused ? 'paused' : 'pending', staffId: sub.staffId, orderedQuantity: sub.quantity, priceMinor: resolvePrice(paper as unknown as Publication, serviceDate) }, $unset: { cancellationReason: '' }, $inc: { revision: 1 } });
+        const mutable=!existing||(!existing.invoiceId&&(['pending','paused'].includes(existing.status)||(existing.status==='publication-cancelled'&&existing.cancellationReason==='subscription-ineligible')));
+        if (serviceDate >= future && mutable) await collection('deliveries').updateOne({ ...key, invoiceId: { $exists: false }, $or: [{ status: { $in: ['pending', 'paused'] } }, { status: 'publication-cancelled', cancellationReason: 'subscription-ineligible' }] }, { $set: { status: paused ? 'paused' : 'pending', ...(sub.staffId?{staffId:sub.staffId}:{}), orderedQuantity: sub.quantity, priceMinor: paused?0:resolvePrice(paper as unknown as Publication, serviceDate),publicationRevision:paper.revision }, $unset: { cancellationReason: '' }, $inc: { revision: 1 } });
       }
     }
   }
@@ -134,7 +137,8 @@ export function operations({ db, client }: Dependencies) {
   });
   for (const resource of ['payments', 'adjustments']) router.post(`/${resource}`, async (req, res) => {
     const scope: AccessScope = res.locals.scope; requireRole(scope, 'admin');
-    const data = z.object({ invoiceId: z.string().uuid(), amountMinor: z.number().int().min(1).max(100000000), reference: z.string().trim().min(1).max(200) }).parse(req.body);
+    const parsed = z.object({ invoiceId: z.string().uuid(), amountMinor: z.number().int().min(1).max(100000000), reference: z.string().trim().min(1).max(200),direction:z.enum(['credit','debit']).default('credit') }).parse(req.body);
+    const data={...parsed,amountMinor:resource==='adjustments'&&parsed.direction==='debit'?-parsed.amountMinor:parsed.amountMinor};
     const key = z.string().min(8).max(100).parse(req.get('Idempotency-Key'));
     const operation = JSON.stringify({ resource, ...data });
     const session = client.startSession(); let entity;
@@ -174,13 +178,19 @@ export function operations({ db, client }: Dependencies) {
       const original = await collection(resource).findOne({ societyId: scope.societyId, id: req.params.id }, { session });
       if (!original || original.reversalOf) throw new ApiError(404, 'Original entry not found');
       if (await collection(resource).findOne({ societyId: scope.societyId, reversalOf: original.id }, { session })) throw new ApiError(409, 'Already reversed');
-      await collection('invoices').updateOne({ societyId: scope.societyId, id: original.invoiceId }, { $inc: { revision: 1 } }, { session });
+      const invoice=await collection('invoices').findOneAndUpdate({ societyId: scope.societyId, id: original.invoiceId }, { $inc: { revision: 1 } }, { session,returnDocument:'after' });
+      if(!invoice)throw new ApiError(404,'Invoice not found');
+      if(resource==='adjustments'&&(await ledgerSnapshot(db,invoice,session)).adjustmentsMinor-original.amountMinor>invoice.totalMinor)throw new ApiError(409,'Reverse the related credits before removing this additional charge');
       if (resource === 'payments') {
         const rows = await db.collection('paymentAllocations').find({ societyId: scope.societyId, invoiceId: original.invoiceId, paymentId: original.id }, { session }).toArray();
         const allocated = rows.reduce((s, r) => s + r.amountMinor, 0);
         if (allocated) await db.collection('paymentAllocations').insertOne({ id: randomUUID(), societyId: scope.societyId, invoiceId: original.invoiceId, paymentId: original.id, amountMinor: -allocated, reversal: true, createdAt: new Date() }, { session });
       }
-      await collection(resource).insertOne({ id: randomUUID(), societyId: scope.societyId, revision: 0, residentId: original.residentId, invoiceId: original.invoiceId, reversalOf: original.id, amountMinor: -original.amountMinor, reference: reason, createdAt: new Date().toISOString(), userId: scope.userId }, { session });
+      const reversalId=randomUUID();
+      await collection(resource).insertOne({ id: reversalId, societyId: scope.societyId, revision: 0, residentId: original.residentId, invoiceId: original.invoiceId, reversalOf: original.id, amountMinor: -original.amountMinor, reference: reason, createdAt: new Date().toISOString(), userId: scope.userId }, { session });
+      if(resource==='adjustments'){
+        await releaseAllocations(db,invoice,reversalId,(await ledgerSnapshot(db,invoice,session)).adjustmentsMinor,session);
+      }
     }); } finally { await session.endSession(); }
     res.json({ ok: true });
   });

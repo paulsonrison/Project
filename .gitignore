@@ -17,6 +17,7 @@ dist-ssr
 dist-server
 playwright-report
 test-results
+test-results-*
 .superpowers
 
 # Editor directories and files

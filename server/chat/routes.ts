@@ -32,7 +32,7 @@ export function chatRoutes({ db, config }: Dependencies) {
   });
   router.post('/messages', limit, async (req, res) => {
     const scope: AccessScope = res.locals.scope;
-    const data = z.object({ threadId: z.string().uuid(), text: z.string().trim().min(1).max(4000) }).parse(req.body);
+    const data = z.object({ threadId: z.string().uuid(), text: z.string().trim().min(1).max(4000),locale:z.enum(['en-IN','hi-IN','ml-IN']).default('en-IN') }).parse(req.body);
     if (!await db.collection('chatThreads').findOne({ ...filter(scope), id: data.threadId })) throw new ApiError(404, 'Conversation not found');
     if (!await db.collection('chatThreads').findOne({ ...filter(scope), id: data.threadId, accessKey: await accessKey(scope) })) throw new ApiError(409, 'Your permissions changed. Start a new conversation.');
     const recent = await db.collection('chatMessages').find({ ...filter(scope), threadId: data.threadId }).sort({ at: -1 }).limit(12).toArray();
@@ -42,7 +42,7 @@ export function chatRoutes({ db, config }: Dependencies) {
     const quota = await db.collection('chatQuotas').updateOne({ societyId: scope.societyId, day, count: { $lt: 1000 } }, { $inc: { count: 1 } });
     if (!quota.modifiedCount) throw new ApiError(429, 'Your society has reached its daily assistant limit');
     let answer;
-    try { answer = await answerMessage(db, config, scope, data.text, history); }
+    try { answer = await answerMessage(db, config, scope, data.text, history,data.locale); }
     catch (err) { if (err instanceof ApiError) throw err; throw new ApiError(503, 'The assistant could not complete this request. Please retry.'); }
     const expiresAt = new Date(Date.now() + 30 * 86400000), at = new Date();
     await db.collection('chatMessages').insertMany([{ id: randomUUID(), ...filter(scope), threadId: data.threadId, text: data.text, role: 'user', at, expiresAt }, { id: randomUUID(), ...filter(scope), threadId: data.threadId, ...answer, role: 'assistant', at: new Date(at.getTime() + 1), expiresAt }]);

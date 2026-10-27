@@ -16,6 +16,10 @@ export async function createIndexes(db: Db) {
   await db.collection('idempotency').createIndex({ societyId: 1, key: 1 }, { unique: true });
   await db.collection('chatQuotas').createIndex({ societyId: 1, day: 1 }, { unique: true });
   await db.collection('paymentAllocations').createIndex({ societyId: 1, invoiceId: 1, paymentId: 1 });
+  await db.collection('importTemplates').createIndex({expiresAt:1},{expireAfterSeconds:0});
+  await db.collection('importBatches').createIndex({societyId:1,id:1},{unique:true});
+  await db.collection('ratePreviews').createIndex({expiresAt:1},{expireAfterSeconds:0});
+  await db.collection('publications').createIndex({societyId:1,code:1},{unique:true,partialFilterExpression:{code:{$type:'string'}}});
 }
 export async function connect(config: Config) {
   const client = await new MongoClient(config.mongoUri, { serverSelectionTimeoutMS: 10000 }).connect();
