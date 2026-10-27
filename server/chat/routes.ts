@@ -6,6 +6,7 @@ import type { AccessScope } from '../../shared/contracts.js';
 import type { Dependencies } from '../app.js';
 import { ApiError } from '../auth/scope.js';
 import { answerMessage } from './service.js';
+import { resolveAiConfig } from '../preferences/service.js';
 export function chatRoutes({ db, config }: Dependencies) {
   const router = Router();
   const limit = rateLimit({ windowMs: 60000, limit: 10, keyGenerator: (_req, res) => res.locals.scope.userId, standardHeaders: 'draft-8', legacyHeaders: false });
@@ -42,7 +43,7 @@ export function chatRoutes({ db, config }: Dependencies) {
     const quota = await db.collection('chatQuotas').updateOne({ societyId: scope.societyId, day, count: { $lt: 1000 } }, { $inc: { count: 1 } });
     if (!quota.modifiedCount) throw new ApiError(429, 'Your society has reached its daily assistant limit');
     let answer;
-    try { answer = await answerMessage(db, config, scope, data.text, history,data.locale); }
+    try { answer = await answerMessage(db, await resolveAiConfig(db,config,scope), scope, data.text, history,data.locale); }
     catch (err) { if (err instanceof ApiError) throw err; throw new ApiError(503, 'The assistant could not complete this request. Please retry.'); }
     const expiresAt = new Date(Date.now() + 30 * 86400000), at = new Date();
     await db.collection('chatMessages').insertMany([{ id: randomUUID(), ...filter(scope), threadId: data.threadId, text: data.text, role: 'user', at, expiresAt }, { id: randomUUID(), ...filter(scope), threadId: data.threadId, ...answer, role: 'assistant', at: new Date(at.getTime() + 1), expiresAt }]);

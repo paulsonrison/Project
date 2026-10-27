@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { acceptDefaultSetup } from './helpers';
 
 test('owner creates a subscription and reviews the round without delivery staff', async ({ page }) => {
   await page.goto('/signin?mode=register');
@@ -7,11 +8,13 @@ test('owner creates a subscription and reviews the round without delivery staff'
   await page.getByLabel('Society / business name').fill('Solo newspaper round');
   await page.getByLabel('Password', { exact: true }).fill('solo-browser-password-123');
   await page.getByRole('button', { name: 'Create workspace' }).click();
-  await expect(page.getByRole('link', { name: 'Today', exact: false })).toBeVisible();
+  await acceptDefaultSetup(page);
+  await expect(page.locator('.sidebar').getByRole('link', { name: 'Today', exact: false })).toBeVisible();
   const origin = 'http://127.0.0.1:5173';
   await page.request.post('/api/v1/residents', { headers: { Origin: origin }, data: { name: 'Reader', unit: 'B-12' } });
   await page.request.post('/api/v1/publications', { headers: { Origin: origin }, data: { name: 'Malayala Manorama', schedule: 'daily', basePrice: 600 } });
-  await page.getByRole('link', { name: 'Subscriptions', exact: false }).click();
+  await page.locator('.sidebar').getByRole('link', { name: 'Customers', exact: false }).click();
+  await page.getByRole('navigation', { name: 'Page sections' }).getByRole('link', { name: 'Subscriptions', exact: true }).click();
   await page.getByRole('button', { name: /Add subscription/i }).click();
   await expect(page.getByLabel('Delivery staff')).toHaveCount(0);
   await page.getByRole('combobox', { name: /Resident/ }).selectOption({ label: 'Reader · B-12' });

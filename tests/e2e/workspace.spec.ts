@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { acceptDefaultSetup } from './helpers';
 test('society onboarding, resident persistence and private assistant states', async ({ page }, testInfo) => {
   await page.goto('/signin?mode=register');
   await page.getByLabel('Your name').fill('Browser Test Admin');
@@ -6,7 +7,8 @@ test('society onboarding, resident persistence and private assistant states', as
   await page.getByLabel('Society / business name').fill('Morning Society');
   await page.getByLabel('Password', { exact: true }).fill('browser-test-password-123');
   await page.getByRole('button', { name: 'Create workspace' }).click();
-  await expect(page.getByRole('heading', { name: 'Every morning, a clear start.' })).toBeVisible();
+  await acceptDefaultSetup(page);
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Customers', exact: false }).click();
   await page.getByRole('button', { name: /Add customer/i }).click();
   await page.getByLabel('Full name').fill('Test Reader');
@@ -15,8 +17,9 @@ test('society onboarding, resident persistence and private assistant states', as
   await expect(page.getByRole('cell', { name: 'Test Reader', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('cell', { name: 'Test Reader', exact: true })).toBeVisible();
-  await page.getByRole('link', { name: 'Account assistant' }).click();
-  await expect(page.getByRole('heading', { name: 'A little clarity, on demand.' })).toBeVisible();
+  await page.locator('.sidebar').getByRole('link', { name: 'Settings', exact: false }).click();
+  await page.getByRole('navigation', { name: 'Page sections' }).getByRole('link', { name: 'Account assistant', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Account assistant' })).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: testInfo.outputPath('chat-desktop.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'What subscriptions do I have?' }).click();
