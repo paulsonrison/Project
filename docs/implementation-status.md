@@ -1,5 +1,15 @@
 # Implementation and verification status
 
+## Owner workflow release — 27 October 2026
+
+The approved owner workflow extension adds four contextual Excel modes, server-held review/transactional commit, publication code/edition fields, effective bounded rates with daily history, and English/Hindi/Malayalam UI. New subscriptions no longer require staff; Today supports reviewed owner round confirmation. Historical deliveries/invoice amounts remain durable; retrospective credits and additional charges are audited ledger entries with reversal safeguards.
+
+Groq data entry accepts only explicitly reviewed publication codes/names, quantities and dates. Customer names, phones, flats, addresses and free text are excluded from that provider boundary. Existing account chat now canonicalizes local intent and strips personal fields/history before requesting an answer. Models do not write records.
+
+Local verification: 71 unit/integration/UI tests passed, frontend/server typechecks and production builds passed, lint passed, and the runtime audit reported zero vulnerabilities. Six browser workflows passed before the final narrow credit/locale changes; the release ledger records the final browser run and hosted results. See `docs/implementation/2026-10-26-owner-workflow-progress.md` and `docs/deployment/owner-workflow-runbook.md` for exact scope, unresolved pilot work and deployment evidence. Native translation review, broad device/accessibility review, fixed monthly plans, offline support and actual Atlas restore rehearsal remain outside completion claims.
+
+The sections below describe the preceding pilot baseline and are retained as historical context. Its quoted 18-test result is superseded by the owner-release verification above.
+
 Updated 2026-10-26. This is a verified pilot implementation, not a claim that all production acceptance criteria in the design have been completed.
 
 ## Implemented

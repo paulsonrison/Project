@@ -21,11 +21,18 @@ export function getServiceDates(p: Publication, subscription: DateRange, pauses:
 }
 export function resolvePrice(p: Publication, date: string): number {
   const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
-  const exact = p.priceExceptions?.find(r => r.type === 'specific_date' && r.specificDate === date);
-  const weekday = p.priceExceptions?.find(r => r.type === 'day_of_week' && r.dayOfWeek === dow);
-  const monthly = p.monthlyPrices?.find(r => r.yearMonth === date.slice(0, 7));
+  const valid = (r: {validFrom?: string; validToExclusive?: string}) => (!r.validFrom || r.validFrom<=date) && (!r.validToExclusive || date<r.validToExclusive);
+  const exact = p.priceExceptions?.find(r => r.type === 'specific_date' && r.specificDate === date && valid(r));
+  const weekday = p.priceExceptions?.find(r => r.type === 'day_of_week' && r.dayOfWeek === dow && valid(r));
+  const monthly = p.monthlyPrices?.find(r => r.yearMonth === date.slice(0, 7) && valid(r));
+  const interval = p.rateIntervals?.find(r => valid(r));
+  if (exact || weekday || monthly) return (exact ?? weekday ?? monthly)!.price;
+  if (p.pricingVersion === 2) {
+    if (!interval) throw new Error(`Missing rate for ${date}; enter a dated rate before preparing deliveries`);
+    return interval.price;
+  }
   const historical = [...(p.priceHistory ?? [])].filter(r => r.effectiveDate <= date).sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))[0];
-  return exact?.price ?? weekday?.price ?? monthly?.price ?? historical?.price ?? p.basePrice;
+  return historical?.price ?? p.basePrice;
 }
 export function invoiceTotal(deliveries: DeliveryCharge[]): number {
   if (deliveries.some(d => d.status === 'pending')) throw new Error('Unresolved delivery dates');

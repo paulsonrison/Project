@@ -7,8 +7,8 @@ test('society onboarding, resident persistence and private assistant states', as
   await page.getByLabel('Password', { exact: true }).fill('browser-test-password-123');
   await page.getByRole('button', { name: 'Create workspace' }).click();
   await expect(page.getByRole('heading', { name: 'Every morning, a clear start.' })).toBeVisible();
-  await page.getByRole('link', { name: 'Residents', exact: false }).click();
-  await page.getByRole('button', { name: 'Add resident' }).click();
+  await page.getByRole('link', { name: 'Customers', exact: false }).click();
+  await page.getByRole('button', { name: /Add customer/i }).click();
   await page.getByLabel('Full name').fill('Test Reader');
   await page.getByLabel('Apartment / unit').fill('A-101');
   await page.getByRole('button', { name: 'Save record' }).click();
@@ -26,7 +26,7 @@ test('society onboarding, resident persistence and private assistant states', as
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 375, height: 812 });
   await page.getByRole('button', { name: 'Toggle navigation' }).click();
-  await expect(page.getByRole('link', { name: 'Residents', exact: false })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Customers', exact: false })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('button', { name: 'Close navigation menu', exact: true }).click();
   await page.screenshot({ path: testInfo.outputPath('chat-mobile.png'), fullPage: true, animations: 'disabled' });

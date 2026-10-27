@@ -1,0 +1,35 @@
+import { expect, test } from '@playwright/test';
+
+test('owner creates a subscription and reviews the round without delivery staff', async ({ page }) => {
+  await page.goto('/signin?mode=register');
+  await page.getByLabel('Your name').fill('Solo Owner');
+  await page.getByLabel('Email address').fill(`solo-${Date.now()}@example.test`);
+  await page.getByLabel('Society / business name').fill('Solo newspaper round');
+  await page.getByLabel('Password', { exact: true }).fill('solo-browser-password-123');
+  await page.getByRole('button', { name: 'Create workspace' }).click();
+  await expect(page.getByRole('link', { name: 'Today', exact: false })).toBeVisible();
+  const origin = 'http://127.0.0.1:5173';
+  await page.request.post('/api/v1/residents', { headers: { Origin: origin }, data: { name: 'Reader', unit: 'B-12' } });
+  await page.request.post('/api/v1/publications', { headers: { Origin: origin }, data: { name: 'Malayala Manorama', schedule: 'daily', basePrice: 600 } });
+  await page.getByRole('link', { name: 'Subscriptions', exact: false }).click();
+  await page.getByRole('button', { name: /Add subscription/i }).click();
+  await expect(page.getByLabel('Delivery staff')).toHaveCount(0);
+  await page.getByRole('combobox', { name: /Resident/ }).selectOption({ label: 'Reader · B-12' });
+  await page.getByRole('combobox', { name: /Newspaper/ }).selectOption({ label: 'Malayala Manorama' });
+  await page.getByLabel('Copies per delivery').fill('1');
+  await page.getByLabel('First delivery date').fill('2026-01-01');
+  await page.getByLabel('Stop date (not delivered)').fill('2026-01-02');
+  await page.getByRole('button', { name: 'Save record' }).click();
+  await expect(page.getByRole('cell', { name: 'Malayala Manorama', exact: true })).toBeVisible();
+  await page.goto('/delivery-boy');
+  await expect(page).toHaveURL(/\/today$/);
+  await page.getByLabel('Service date').fill('2026-01-01');
+  await page.getByRole('button', { name: 'Prepare delivery round' }).click();
+  await expect(page.getByText('B-12 · Reader', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Confirm today’s round' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Only selected pending deliveries');
+  await page.getByRole('button', { name: 'Confirm selected deliveries' }).click();
+  await expect(page.getByRole('status')).toHaveText('Confirmed 1 deliveries.');
+  await page.getByRole('link', { name: 'Settings', exact: false }).click();
+  await expect(page.getByRole('tab', { name: 'Delivery staff' })).toHaveCount(0);
+});
